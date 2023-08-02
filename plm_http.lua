@@ -92,11 +92,6 @@ function plm_http.dissector(tvb, pinfo, tree)
         -- add param value pair to tree
         local pairs_tree = subtree:add(tab_range, "[Response Data]")
         local data = json.decode(responsedata)
-        --for key, value in pairs(data) do
-        --    if type(value) ~= "table" then
-        --        pairs_tree:add(tab_range, string.format("%s = %s", key, value))
-        --    end
-        --end
         TableHelper:addtabletree(tab_range, data, pairs_tree)
         PrintTable(data)
     end

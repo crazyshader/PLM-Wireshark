@@ -13,7 +13,22 @@ plm_protocol.fields = {
     packet_id, packet_length, packet_data
 }
 
-function plm_protocol.dissector(buffer, pinfo, tree)
+function get_packet_length(buffer, pinfo, tree)
+    local rawdata = buffer():raw()
+    local length = string.len(rawdata)
+    local offset = 0
+    while (offset < length)
+    do
+        offset = offset + 4
+        local lengthBuffer = buffer(offset,4)
+        offset = offset + 4
+        local datalength = lengthBuffer:le_uint()
+        offset = offset + datalength
+    end
+    return offset
+end
+
+function dissect_packet_pdu(buffer, pinfo, tree)
     local rawdata = buffer():raw()
     local length = string.len(rawdata)
     if length == 0 then return end
@@ -44,10 +59,20 @@ function plm_protocol.dissector(buffer, pinfo, tree)
         if packetid ~= 1 then
             local data = json.decode(dataBuffer)
             local subtreedata = protocolSubtree:add(packet_data, buffer(), "")
-            TableHelper:addtabletree(buffer(), data["DATA"], subtreedata)
+            if type(data["DATA"]) == "table" then
+                TableHelper:addtabletree(buffer(), data["DATA"], subtreedata)
+            else
+                subtreedata:add(buffer(), string.format("Data = %s", data["DATA"]))
+            end
             PrintTable(data)
         end
     end
+end
+
+function plm_protocol.dissector(buffer, pinfo, tree)
+    dissect_tcp_pdus(buffer, tree, 4, get_packet_length, dissect_packet_pdu)
+    local bytes_length = buffer:len()
+    return bytes_length
 end
 
 function get_packet_name(packetid)
