@@ -142,11 +142,15 @@ function IterTable(t, stack, output, dataType, printer)
 	end
 end
 
-function PrintTable(t)
+function GetTableString(t)
 	if type(t) ~= "table" then
-		print(tostring(t))
+		return tostring(t)
 	end
-	print(IterTable(t, nil, nil, DefaultPrinter))
+	return IterTable(t, nil, nil, DefaultPrinter)
+end
+
+function PrintTable(t)
+	print(GetTableString(t))
 end
 
 --PrintTable({{},{{}},{{},{},{}}})
