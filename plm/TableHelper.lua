@@ -1,5 +1,20 @@
 local TableHelper = {}
 
+function TableHelper:deepcopytable(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[TableHelper:deepcopytable(orig_key)] = TableHelper:deepcopytable(orig_value)
+        end
+        setmetatable(copy, TableHelper:deepcopytable(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
 function TableHelper:addtabletree(range, table, tree)
     if table == nil then return end
     for key, value in pairs(table) do

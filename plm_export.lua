@@ -19,21 +19,61 @@ if (gui_enabled()) then
     local reassembled_in = Field.new("tcp.reassembled_in")
     local segment_count = Field.new("tcp.segment.count")
 
-    local function save_protocol()
-
+    local function get_save_path()
         local save_path = os.getenv("USERPROFILE") .. "\\Documents\\PLM_Protocol\\"
         if not Dir.exists(save_path) then
             Dir.make(save_path)
         end
-        local save_filepath = save_path .. "PLM_Protocol_" .. os.date("%Y-%m-%d-%H-%M-%S")  .. ".txt"
+        return save_path
+    end
+
+    local function remove_defined_protocol(protocoldata, packetdata, finddata, key)
+        local beginindex, _ = string.find(packetdata, finddata)
+        if beginindex == nil then
+            protocoldata[key] = nil
+        end
+    end
+
+    local function save_Undefined_protocol()
+
+        local save_filepath = get_save_path() .. "PLM_Undefined_Protocol_" .. os.date("%Y-%m-%d-%H-%M-%S")  .. ".txt"
+        local file = assert(io.open(save_filepath, "w"))
+        local undefinedprotocoldata = TableHelper:deepcopytable(plm_dissector.protocoldata)
+        for key, protocoldatas in pairs(undefinedprotocoldata) do
+            if plm_dissector.protocoltype[key] == plm_dissector.dissectortype.PLM_HTTP then
+                undefinedprotocoldata[key] = nil
+            end
+            for _, protocoldata in ipairs(protocoldatas) do
+                if protocoldata["MSG_ID"] ~= nil then
+                    remove_defined_protocol(undefinedprotocoldata, protocoldata["MSG_ID"], "Unknown", key)
+                    remove_defined_protocol(undefinedprotocoldata, protocoldata["MSG_ID"], "Undefined", key)
+                elseif protocoldata["ACTION"] ~= nil then
+                    remove_defined_protocol(undefinedprotocoldata, protocoldata["ACTION"], "-1", key)
+                end
+            end
+        end
+        file:write(string.format("Undefined Protocol Count:%d\n\n", TableHelper:getTableLength(undefinedprotocoldata)))
+        for number, protocoldata in TableHelper:pairsByKeys(undefinedprotocoldata) do
+            local data = GetTableString(protocoldata)
+            local type = plm_dissector:get_dissector_name(plm_dissector.protocoltype[number])
+            file:write(string.format("Frame:%d Type:%s %s\n", number, type, data))
+        end
+        file:close()
+        print("Save undefined protocol to path:" .. save_filepath)
+    end
+
+    local function save_all_protocol()
+
+        local save_filepath = get_save_path() .. "PLM_Protocol_" .. os.date("%Y-%m-%d-%H-%M-%S")  .. ".txt"
         local file = assert(io.open(save_filepath, "w"))
         file:write(string.format("Protocol Count:%d\n\n", TableHelper:getTableLength(plm_dissector.protocoldata)))
         for number, protocoldata in TableHelper:pairsByKeys(plm_dissector.protocoldata) do
             local data = GetTableString(protocoldata)
-            file:write(string.format("Frame:%d %s\n", number, data))
+            local type = plm_dissector:get_dissector_name(plm_dissector.protocoltype[number])
+            file:write(string.format("Frame:%d Type:%s %s\n", number, type, data))
         end
         file:close()
-        print("Save Path:" .. save_filepath)
+        print("Save all protocol to path:" .. save_filepath)
     end
 
     -- Export Window
@@ -43,7 +83,8 @@ if (gui_enabled()) then
 		export_open = true
 
 		local w = TextWindow.new("Export Protocol")
-		w:add_button("Save", function() save_protocol() end)
+        w:add_button("Save Undefined", function() save_Undefined_protocol() end)
+		w:add_button("Save All", function() save_all_protocol() end)
 
         plm_dissector.protocoldata = {}
         plm_dissector.protocoltype = {}
@@ -125,7 +166,8 @@ if (gui_enabled()) then
                     --print("Missing Protocol:" .. number)
                 end
                 local data = GetTableString(protocoldata)
-                print(string.format("Frame:%d %s", number, data))
+                local type = plm_dissector:get_dissector_name(plm_dissector.protocoltype[number])
+                print(string.format("Frame:%d Type:%s \n %s", number, type, data))
                 last = number
             end
         end

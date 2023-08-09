@@ -1,10 +1,30 @@
 local plm_define = {}
 
+function plm_define:get_lobby_packet_name(packetid)
+
+    local packetname = "Unknown"
+    if packetid ==    1 then packetname = "心跳"
+	elseif packetid == 101 then packetname = "登陆大厅"
+    elseif packetid == 0 then packetname = "全局消息"
+    else
+        if packetid == 11 then packetname = "俱乐部在线人数"
+        elseif packetid == 101 then packetname = "登陆大厅"
+        elseif packetid == -2 then packetname = "获得房卡"
+        elseif packetid == -3 then packetname = "更新Token"
+        end
+        packetname = packetname .. " Undefined"
+    end
+    return packetname
+end
+
 function plm_define:get_lobby_packet_id(packetname)
 
     local packetid = -1
     if packetname ==    "login" then packetid = 101
     elseif packetname == "heart" then packetid = 1
+    elseif packetname == "circle_online_count" then packetid = 11
+    elseif packetname == "addRoomCard" then packetid = -2
+    elseif packetname == "token_update" then packetid = -3
     elseif packetname == "global_data" then packetid = 0
     end
     return packetid
@@ -53,7 +73,7 @@ function plm_define:get_packet_name(packetid)
         elseif packetid == 5012 then packetname = "叫牌成功"
         elseif packetid == 4142 then packetname = "更换房主"
         end
-        packetname = packetname .. " (undefined)"
+        packetname = packetname .. " Undefined"
     end
 
     return packetname
