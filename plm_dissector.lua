@@ -5,7 +5,7 @@ require "PrintTable"
 
 local plm_dissector = {}
 plm_dissector.protocoldata = {}
-plm_dissector.protocoltype = {}
+plm_dissector.protocolinfo = {}
 
 plm_dissector.dissectortype = { PLM_HTTP = 1, PLM_LOBBY = 2, PLM_GAME = 3 }
 
@@ -49,6 +49,8 @@ end
 
 local httpuri = Field.new("http.request.uri")
 local httpdata = Field.new("http.file_data")
+local responsein = Field.new("http.response_in")
+local requestin = Field.new("http.request_in")
 
 function plm_dissector:http_dissector(tvb, pinfo, tree, plm_http)
 
@@ -116,12 +118,17 @@ function plm_dissector:http_dissector(tvb, pinfo, tree, plm_http)
             pairs_tree:append_text(" (" .. count .. ")")
         end
 
+        local responseframe = -1
+        local response_in = responsein()
+        if response_in ~= nil then
+            responseframe = response_in.value
+        end
         if plm_http ~= nil then
-            plm_dissector.protocoltype[pinfo.number] = plm_dissector.dissectortype.PLM_HTTP
+            plm_dissector.protocolinfo[pinfo.number] = { type = plm_dissector.dissectortype.PLM_HTTP, from = nil, to = responseframe }
         else
             plm_dissector.protocoldata[pinfo.number] = datatable
         end
-        print(string.format("Frame:%d Type:PLM HTTP Request\n %s", pinfo.number, GetTableString(datatable)))
+        print(string.format("[PLM HTTP] Frame: %d Request -> Frame: %d Reponse\n %s", pinfo.number, responseframe, GetTableString(datatable)))
     elseif http_data ~= nil then
         local responsedata = http_data.range():raw()
         local tab = ByteArray.new(string2hex(responsedata)):tvb("Decoded HTTP Response")
@@ -145,12 +152,17 @@ function plm_dissector:http_dissector(tvb, pinfo, tree, plm_http)
             TableHelper:addtabletree(tab_range, data, pairs_tree)
         end
 
+        local requestframe = -1
+        local request_in = requestin()
+        if request_in ~= nil then
+            requestframe = request_in.value
+        end
         if plm_http ~= nil then
-            plm_dissector.protocoltype[pinfo.number] = plm_dissector.dissectortype.PLM_HTTP
+            plm_dissector.protocolinfo[pinfo.number] = { type = plm_dissector.dissectortype.PLM_HTTP, from = requestframe, to = nil }
         else
             plm_dissector.protocoldata[pinfo.number] = data
         end
-        print(string.format("Frame:%d Type:PLM HTTP Response\n %s", pinfo.number, GetTableString(data)))
+        print(string.format("[PLM HTTP] Frame:%d Response -> Frame: %d Request\n %s", pinfo.number, requestframe, GetTableString(data)))
     end
 end
 
@@ -198,7 +210,7 @@ function plm_dissector:lobby_dissector(buffer, pinfo, tree, plm_protocol)
                 data["ACTION"] = tostring(packetid) .. " (" .. packetname .. " | " .. plm_define:get_lobby_packet_name(packetid) .. ")"
             end
             if plm_protocol ~= nil then
-                plm_dissector.protocoltype[pinfo.number] = plm_dissector.dissectortype.PLM_LOBBY
+                plm_dissector.protocolinfo[pinfo.number] =  { type = plm_dissector.dissectortype.PLM_LOBBY }
             else
                 if plm_dissector.protocoldata[pinfo.number] ~= nil then
                     table.insert(plm_dissector.protocoldata[pinfo.number], data)
@@ -206,7 +218,7 @@ function plm_dissector:lobby_dissector(buffer, pinfo, tree, plm_protocol)
                     plm_dissector.protocoldata[pinfo.number] = { data }
                 end
             end
-            print(string.format("Frame:%d Type:PLM LOBBY\n %s", pinfo.number, GetTableString(data)))
+            print(string.format("[PLM LOBBY] Frame:%d\n %s", pinfo.number, GetTableString(data)))
         end
     until (string.len(packetdata) == 0)
 end
@@ -266,7 +278,7 @@ function plm_dissector:game_dissector(buffer, pinfo, tree, plm_protocol)
                 data["MSG_ID"] = data["MSG_ID"] .. " (" .. packetname .. ")"
             end
             if plm_protocol ~= nil then
-                plm_dissector.protocoltype[pinfo.number] = plm_dissector.dissectortype.PLM_GAME
+                plm_dissector.protocolinfo[pinfo.number] = { type = plm_dissector.dissectortype.PLM_GAME }
             else
                 if plm_dissector.protocoldata[pinfo.number] ~= nil then
                     table.insert(plm_dissector.protocoldata[pinfo.number], data)
@@ -274,7 +286,7 @@ function plm_dissector:game_dissector(buffer, pinfo, tree, plm_protocol)
                     plm_dissector.protocoldata[pinfo.number] = { data }
                 end
             end
-            print(string.format("Frame:%d Type:PLM GAME\n %s", pinfo.number, GetTableString(data)))
+            print(string.format("[PLM GAME] Frame:%d \n %s", pinfo.number, GetTableString(data)))
         end
     end
 end

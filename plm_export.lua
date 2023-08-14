@@ -40,7 +40,7 @@ if (gui_enabled()) then
         local file = assert(io.open(save_filepath, "w"))
         local undefinedprotocoldata = TableHelper:deepcopytable(plm_dissector.protocoldata)
         for key, protocoldatas in pairs(undefinedprotocoldata) do
-            if plm_dissector.protocoltype[key] == plm_dissector.dissectortype.PLM_HTTP then
+            if plm_dissector.protocolinfo[key]["type"] == plm_dissector.dissectortype.PLM_HTTP then
                 undefinedprotocoldata[key] = nil
             end
             for _, protocoldata in ipairs(protocoldatas) do
@@ -55,8 +55,14 @@ if (gui_enabled()) then
         file:write(string.format("Undefined Protocol Count:%d\n\n", TableHelper:getTableLength(undefinedprotocoldata)))
         for number, protocoldata in TableHelper:pairsByKeys(undefinedprotocoldata) do
             local data = GetTableString(protocoldata)
-            local type = plm_dissector:get_dissector_name(plm_dissector.protocoltype[number])
-            file:write(string.format("Frame:%d Type:%s %s\n", number, type, data))
+            local type = plm_dissector:get_dissector_name(plm_dissector.protocolinfo[number]["type"])
+            if plm_dissector.protocolinfo[number]["from"] == nil and plm_dissector.protocolinfo[number]["to"] ~= nil then
+                file:write(string.format("[%s] Frame:%d Request -> Frame:%d Response\n %s\n", type, number, plm_dissector.protocolinfo[number]["to"], data))
+            elseif plm_dissector.protocolinfo[number]["from"] ~= nil and plm_dissector.protocolinfo[number]["to"] == nil then
+                file:write(string.format("[%s] Frame:%d Response -> Frame:%d Request\n %s\n", type, number, plm_dissector.protocolinfo[number]["from"], data))
+            else
+                file:write(string.format("[%s] Frame:%d\n %s\n", type, number, data))
+            end
         end
         file:close()
         print("Save undefined protocol to path:" .. save_filepath)
@@ -69,8 +75,14 @@ if (gui_enabled()) then
         file:write(string.format("Protocol Count:%d\n\n", TableHelper:getTableLength(plm_dissector.protocoldata)))
         for number, protocoldata in TableHelper:pairsByKeys(plm_dissector.protocoldata) do
             local data = GetTableString(protocoldata)
-            local type = plm_dissector:get_dissector_name(plm_dissector.protocoltype[number])
-            file:write(string.format("Frame:%d Type:%s %s\n", number, type, data))
+            local type = plm_dissector:get_dissector_name(plm_dissector.protocolinfo[number]["type"])
+            if plm_dissector.protocolinfo[number]["from"] == nil and plm_dissector.protocolinfo[number]["to"] ~= nil then
+                file:write(string.format("[%s] Frame:%d Request -> Frame:%d Response\n %s\n", type, number, plm_dissector.protocolinfo[number]["to"], data))
+            elseif plm_dissector.protocolinfo[number]["from"] ~= nil and plm_dissector.protocolinfo[number]["to"] == nil then
+                file:write(string.format("[%s] Frame:%d Response -> Frame:%d Request\n %s\n", type, number, plm_dissector.protocolinfo[number]["from"], data))
+            else
+                file:write(string.format("[%s] Frame:%d\n %s\n", type, number, data))
+            end
         end
         file:close()
         print("Save all protocol to path:" .. save_filepath)
@@ -87,7 +99,7 @@ if (gui_enabled()) then
 		w:add_button("Save All", function() save_all_protocol() end)
 
         plm_dissector.protocoldata = {}
-        plm_dissector.protocoltype = {}
+        plm_dissector.protocolinfo = {}
 
         local tap = Listener.new();
         local function remove()
@@ -129,9 +141,13 @@ if (gui_enabled()) then
                 table.insert(reassembled, { ["framenumber"] = reassembledin.value, ["framedata"] = payload() })
             end
 
-            if plm_dissector.protocoltype[pinfo.number] == plm_dissector.dissectortype.PLM_LOBBY then
+            if plm_dissector.protocolinfo[pinfo.number] == nil then
+                return
+            end
+
+            if plm_dissector.protocolinfo[pinfo.number]["type"] == plm_dissector.dissectortype.PLM_LOBBY then
                 plm_dissector:lobby_dissector(payload, pinfo, nil, nil)
-            elseif plm_dissector.protocoltype[pinfo.number] == plm_dissector.dissectortype.PLM_GAME then
+            elseif plm_dissector.protocolinfo[pinfo.number]["type"] == plm_dissector.dissectortype.PLM_GAME then
                 if segmentcount ~= nil then
                     local reassemblecount = segmentcount.value
                     if reassemblecount == TableHelper:getTableLength(reassembled) +1 then
@@ -166,8 +182,14 @@ if (gui_enabled()) then
                     --print("Missing Protocol:" .. number)
                 end
                 local data = GetTableString(protocoldata)
-                local type = plm_dissector:get_dissector_name(plm_dissector.protocoltype[number])
-                print(string.format("Frame:%d Type:%s \n %s", number, type, data))
+                local type = plm_dissector:get_dissector_name(plm_dissector.protocolinfo[number]["type"])
+                if plm_dissector.protocolinfo[number]["from"] == nil and plm_dissector.protocolinfo[number]["to"] ~= nil then
+                    print(string.format("[%s] Frame:%d Request -> Frame:%d Response\n %s", type, number, plm_dissector.protocolinfo[number]["to"], data))
+                elseif plm_dissector.protocolinfo[number]["from"] ~= nil and plm_dissector.protocolinfo[number]["to"] == nil then
+                    print(string.format("[%s] Frame:%d Response -> Frame:%d Request\n %s", type, number, plm_dissector.protocolinfo[number]["from"], data))
+                else
+                    print(string.format("[%s] Frame:%d\n %s", type, number, data))
+                end
                 last = number
             end
         end
@@ -175,7 +197,7 @@ if (gui_enabled()) then
         function tap.reset()
             w:clear()
             plm_dissector.protocoldata = {}
-            plm_dissector.protocoltype = {}
+            plm_dissector.protocolinfo = {}
         end
 
         retap_packets()
